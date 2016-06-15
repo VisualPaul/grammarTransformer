@@ -3,7 +3,7 @@ package ru.hse.transformer
 import scala.io.Source
 
 sealed abstract class RegularCase
-case object LefttLinear extends RegularCase
+case object LeftLinear extends RegularCase
 case object RightLinear extends RegularCase
 case class Term(terminal: Boolean, id: String) {
   def derivative = Term(terminal, id + "'")
@@ -15,17 +15,12 @@ trait Grammar {
   val rules: List[Rule]
   def isContextFree = rules.forall(r => r.lhs.size == 1 && !r.lhs.head.terminal)
   def isRegular(regularCase: RegularCase) = isContextFree && rules.forall(rule => {
-    val r = if (regularCase == RightLinear) rule.rhs else rule.rhs.reverse
-    r match {
-      case List() => true
-      case List(x) => x.terminal
-      case List(x, y) => x.terminal && !y.terminal
-      case _ => false
-    }
+    val r = if (regularCase == LeftLinear) rule.rhs else rule.rhs.reverse
+    r.isEmpty || r.tail.forall(_.terminal)
   })
   def isRegular = isContextFree && rules.forall(r => r.rhs.count(x=> !x.terminal) <= 1)
   def leftLinear2rightLinear(newStart : Term = startingTerm.derivative) : Grammar = {
-    assert(isRegular(LefttLinear))
+    assert(isRegular(LeftLinear))
     val needNewStart = rules.exists(r => r.rhs.contains(startingTerm))
     val oldStartingTerm = startingTerm
     val oldRules = rules
@@ -35,15 +30,17 @@ trait Grammar {
         Term(oldStartingTerm.terminal, oldStartingTerm.id + "'")
       else oldStartingTerm
       override val rules: List[Rule] = oldRules.map {
-        case Rule(List(`oldStartingTerm`), List(x)) =>
-          Rule(List(startingTerm), List(x))
-        case Rule(List(`oldStartingTerm`), List(x, y)) =>
-          Rule(List(x), List(y))
-        case Rule(List(x), List(y)) =>
-          Rule(List(startingTerm), List(Term(y.terminal, y.id), x))
-        case Rule(List(x), List(y, z)) =>
-          Rule(List(y), List(z, x))
-      } ++ (if (needNewStart) List(Rule(List(startingTerm), List(oldStartingTerm))) else List())
+        case Rule(List(`oldStartingTerm`), l) =>
+          if (l.isEmpty || l.head.terminal) // all terminals
+            Rule(List(startingTerm), l)
+          else
+            Rule(List(l.head), l.tail)
+        case Rule(List(x), l) =>
+          if (l.isEmpty || l.head.terminal)
+            Rule(List(startingTerm), l ++ List(x))
+          else
+            Rule(List(l.head), l.tail ++ List(x))
+      }.distinct  ++ (if (needNewStart) List(Rule(List(startingTerm), List(oldStartingTerm))) else List())
     }
   }
 }
@@ -56,6 +53,8 @@ object Grammar {
       assert(arr.length <= 2 && arr.nonEmpty)
       if (arr.length == 1)
         arr = Array(arr(0), "")
+      if (arr(1) == "ε")
+        arr(1) = ""
       Rule(arr(0).map(toTerm).toList, arr(1).map(toTerm).toList)
     }).toList
     new Grammar {
@@ -65,8 +64,9 @@ object Grammar {
   }
   def printToConsole(grammar: Grammar): Unit = {
     for (rule <- grammar.rules) {
-      val line = rule.lhs.map(_.id).mkString + "->" + rule.rhs.map(_.id).mkString
-      println(line)
+      val lhs = rule.lhs.map(_.id).mkString
+      val rhs = if (rule.rhs.isEmpty) "ε" else rule.rhs.map(_.id).mkString
+      println(lhs + "->" + rhs)
     }
   }
 }
