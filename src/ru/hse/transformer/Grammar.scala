@@ -49,13 +49,15 @@ object Grammar {
   def readFromConsole : Grammar = {
     val toTerm = (x: Char) => Term(x.isLower, x.toString)
     val readRules = Source.stdin.getLines.map(ln => {
-      var arr = ln.split("->")
+      val arr = ln.split("->")
       assert(arr.length <= 2 && arr.nonEmpty)
-      if (arr.length == 1)
-        arr = Array(arr(0), "")
-      if (arr(1) == "ε")
-        arr(1) = ""
-      Rule(arr(0).map(toTerm).toList, arr(1).map(toTerm).toList)
+      val (lhs, rhs) = arr match {
+        case Array(x) => (x, "")
+        case Array(x, "ε") => (x, "")
+        case Array(x, y) => (x, y)
+        case _ => throw new RuntimeException("unreachable code reached")
+      }
+      Rule(lhs.map(toTerm).toList, rhs.map(toTerm).toList)
     }).toList
     new Grammar {
       override val startingTerm: Term = toTerm('S')
