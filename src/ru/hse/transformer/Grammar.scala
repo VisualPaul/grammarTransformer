@@ -5,13 +5,13 @@ import scala.io.Source
 sealed abstract class RegularCase
 case object LeftLinear extends RegularCase
 case object RightLinear extends RegularCase
-case class Term(terminal: Boolean, id: String) {
-  def derivative = Term(terminal, id + "'")
+case class Symbol(terminal: Boolean, id: String) {
+  def derivative = Symbol(terminal, id + "'")
 }
-case class Rule(lhs: List[Term], rhs: List[Term])
+case class Rule(lhs: List[Symbol], rhs: List[Symbol])
 
 trait Grammar {
-  val startingTerm : Term
+  val startingSymbol : Symbol
   val rules: List[Rule]
   def isContextFree = rules.forall(r => r.lhs.size == 1 && !r.lhs.head.terminal)
   def isRegular(regularCase: RegularCase) = isContextFree && rules.forall(rule => {
@@ -19,34 +19,34 @@ trait Grammar {
     r.isEmpty || r.tail.forall(_.terminal)
   })
   def isRegular = isContextFree && rules.forall(r => r.rhs.count(x=> !x.terminal) <= 1)
-  def leftLinear2rightLinear(newStart : Term = startingTerm.derivative) : Grammar = {
+  def leftLinear2rightLinear(newStart : Symbol = startingSymbol.derivative) : Grammar = {
     assert(isRegular(LeftLinear))
-    val needNewStart = rules.exists(r => r.rhs.contains(startingTerm))
-    val oldStartingTerm = startingTerm
+    val needNewStart = rules.exists(r => r.rhs.contains(startingSymbol))
+    val oldStartingSymbol = startingSymbol
     val oldRules = rules
     val old = this
     new Grammar {
-      override val startingTerm : Term = if (needNewStart)
-        Term(oldStartingTerm.terminal, oldStartingTerm.id + "'")
-      else oldStartingTerm
+      override val startingSymbol : Symbol = if (needNewStart)
+        newStart
+      else oldStartingSymbol
       override val rules: List[Rule] = oldRules.map {
-        case Rule(List(`oldStartingTerm`), l) =>
+        case Rule(List(`oldStartingSymbol`), l) =>
           if (l.isEmpty || l.head.terminal) // all terminals
-            Rule(List(startingTerm), l)
+            Rule(List(startingSymbol), l)
           else
             Rule(List(l.head), l.tail)
         case Rule(List(x), l) =>
           if (l.isEmpty || l.head.terminal)
-            Rule(List(startingTerm), l ++ List(x))
+            Rule(List(startingSymbol), l ++ List(x))
           else
             Rule(List(l.head), l.tail ++ List(x))
-      }.distinct  ++ (if (needNewStart) List(Rule(List(startingTerm), List(oldStartingTerm))) else List())
+      }.distinct  ++ (if (needNewStart) List(Rule(List(startingSymbol), List(oldStartingSymbol))) else List())
     }
   }
 }
 
 object Grammar {
-  private def readRuleSide(side : String) : List[Term] = {
+  private def readRuleSide(side : String) : List[Symbol] = {
     val tokensRaw = (side + " ").foldLeft((List[String](), List[Char]()))((l, c) => {
       val (terms, last) = l
       if (c.isSpaceChar) {
@@ -61,11 +61,11 @@ object Grammar {
     assert(tokensRaw._2.isEmpty)
 
     tokensRaw._1.reverse.map(str => {
-      Term(str.exists(_.isLower), str)
+      Symbol(str.exists(_.isLower), str)
     }).filter(_.id != "ε")
   }
   def readFromConsole : Grammar = {
-    val toTerm = (x: Char) => Term(x.isLower, x.toString)
+    val toTerm = (x: Char) => Symbol(x.isLower, x.toString)
     val readRules = Source.stdin.getLines.map(ln => {
       val arr = ln.split("->").map(readRuleSide).toList
       assert(arr.length <= 2 && arr.nonEmpty)
@@ -78,7 +78,7 @@ object Grammar {
       Rule(lhs, rhs)
     }).toList
     new Grammar {
-      override val startingTerm: Term = toTerm('S')
+      override val startingSymbol: Symbol = toTerm('S')
       override val rules: List[Rule] = readRules
     }
   }
