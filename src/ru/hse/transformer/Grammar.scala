@@ -46,18 +46,36 @@ trait Grammar {
 }
 
 object Grammar {
+  private def readRuleSide(side : String) : List[Term] = {
+    val tokensRaw = (side + " ").foldLeft((List[String](), List[Char]()))((l, c) => {
+      val (terms, last) = l
+      if (c.isSpaceChar) {
+        if (last.nonEmpty) (last.reverse.mkString :: terms, List[Char]()) else l
+      } else if (c.isLetter) {
+        if (last.nonEmpty) (last.reverse.mkString :: terms, List[Char](c)) else (terms, List[Char](c))
+      } else {
+        assert(last.nonEmpty)
+        (terms, c :: last)
+      }
+    })
+    assert(tokensRaw._2.isEmpty)
+
+    tokensRaw._1.reverse.map(str => {
+      Term(str.exists(_.isLower), str)
+    }).filter(_.id != "ε")
+  }
   def readFromConsole : Grammar = {
     val toTerm = (x: Char) => Term(x.isLower, x.toString)
     val readRules = Source.stdin.getLines.map(ln => {
-      val arr = ln.split("->")
+      val arr = ln.split("->").map(readRuleSide).toList
       assert(arr.length <= 2 && arr.nonEmpty)
       val (lhs, rhs) = arr match {
-        case Array(x) => (x, "")
-        case Array(x, "ε") => (x, "")
-        case Array(x, y) => (x, y)
+        case List(x) => (x, List())
+        case List(x, y) => (x, y)
         case _ => throw new RuntimeException("unreachable code reached")
       }
-      Rule(lhs.map(toTerm).toList, rhs.map(toTerm).toList)
+      assert(lhs.exists(!_.terminal))
+      Rule(lhs, rhs)
     }).toList
     new Grammar {
       override val startingTerm: Term = toTerm('S')
