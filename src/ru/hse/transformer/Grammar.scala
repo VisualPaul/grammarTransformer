@@ -1,5 +1,10 @@
 package ru.hse.transformer
 
+import org.json4s.{JValue, NoTypeHints}
+import org.json4s.JsonAST.{JArray, JBool, JObject, JString}
+import org.json4s.native.JsonMethods._
+import org.json4s.native.Serialization
+
 import scala.io.Source
 
 sealed abstract class RegularCase
@@ -10,9 +15,7 @@ case class Symbol(terminal: Boolean, id: String) {
 }
 case class Rule(lhs: List[Symbol], rhs: List[Symbol])
 
-trait Grammar {
-  val startingSymbol : Symbol
-  val rules: List[Rule]
+case class Grammar(startingSymbol: Symbol, rules: List[Rule]) {
   def isContextFree = rules.forall(r => r.lhs.size == 1 && !r.lhs.head.terminal)
   def isRegular(regularCase: RegularCase) = isContextFree && rules.forall(rule => {
     val r = if (regularCase == LeftLinear) rule.rhs else rule.rhs.reverse
@@ -23,27 +26,23 @@ trait Grammar {
     assert(isRegular(LeftLinear))
     val needNewStart = rules.exists(r => r.rhs.contains(startingSymbol))
     assert(!needNewStart || newStart != startingSymbol)
-    val oldStartingSymbol = startingSymbol
-    val additionalRules = if (!needNewStart) List() else List(Rule(List(newStart), List(oldStartingSymbol)))
+    val additionalRules = if (!needNewStart) List() else List(Rule(List(newStart), List(startingSymbol)))
     val oldRules = rules
+    val start = if (needNewStart) newStart else startingSymbol
     val old = this
-    new Grammar {
-      override val startingSymbol : Symbol = if (needNewStart)
-        newStart
-      else oldStartingSymbol
-      override val rules: List[Rule] = (oldRules ++ additionalRules).map {
-        case Rule(List(this.startingSymbol), l) =>
+    Grammar(startingSymbol = start,
+      rules = (oldRules ++ additionalRules).map {
+        case Rule(List(`start`), l) =>
           if (l.isEmpty || l.head.terminal) // all terminals
-            Rule(List(startingSymbol), l)
+            Rule(List(start), l)
           else
             Rule(List(l.head), l.tail)
         case Rule(List(x), l) =>
           if (l.isEmpty || l.head.terminal)
-            Rule(List(startingSymbol), l ++ List(x))
+            Rule(List(start), l ++ List(x))
           else
             Rule(List(l.head), l.tail ++ List(x))
-      }.distinct
-    }
+      }.distinct)
   }
 }
 
@@ -66,23 +65,21 @@ object Grammar {
       Symbol(str.exists(_.isLower), str)
     }).filter(_.id != "ε")
   }
+  def readRule(rule: String): Rule = {
+    val arr = rule.split("->").map(readRuleSide).toList
+    assert(arr.length <= 2 && arr.nonEmpty)
+    val (lhs, rhs) = arr match {
+      case List(x) => (x, List())
+      case List(x, y) => (x, y)
+      case _ => throw new RuntimeException("unreachable code reached")
+    }
+    assert(lhs.exists(!_.terminal))
+    Rule(lhs, rhs)
+  }
   def readFromConsole : Grammar = {
     val toTerm = (x: Char) => Symbol(x.isLower, x.toString)
-    val readRules = Source.stdin.getLines.map(ln => {
-      val arr = ln.split("->").map(readRuleSide).toList
-      assert(arr.length <= 2 && arr.nonEmpty)
-      val (lhs, rhs) = arr match {
-        case List(x) => (x, List())
-        case List(x, y) => (x, y)
-        case _ => throw new RuntimeException("unreachable code reached")
-      }
-      assert(lhs.exists(!_.terminal))
-      Rule(lhs, rhs)
-    }).toList
-    new Grammar {
-      override val startingSymbol: Symbol = toTerm('S')
-      override val rules: List[Rule] = readRules
-    }
+    val rules = Source.stdin.getLines.map(readRule).toList
+    Grammar(startingSymbol=toTerm('S'), rules=rules)
   }
   def printToConsole(grammar: Grammar): Unit = {
     println("The starting symbol is %s".format(grammar.startingSymbol.id))
