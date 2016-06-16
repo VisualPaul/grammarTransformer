@@ -71,8 +71,10 @@ object Application {
               GrammarRead(x)
           }
         case (st, "load") =>
+          print("Enter file name: ")
           LoadAwaitingName(st)
         case (GrammarRead(g), "save") =>
+          print("Enter file name: ")
           SaveAwaitingName(GrammarRead(g))
         case (st, cmd) =>
           println("incorrect command")
