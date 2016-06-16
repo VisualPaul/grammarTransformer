@@ -1,7 +1,5 @@
 package ru.hse.transformer
 
-import org.json4s.JValue
-
 import scala.io.Source
 
 sealed abstract class RegularCase
