@@ -22,15 +22,17 @@ trait Grammar {
   def leftLinear2rightLinear(newStart : Symbol = startingSymbol.derivative) : Grammar = {
     assert(isRegular(LeftLinear))
     val needNewStart = rules.exists(r => r.rhs.contains(startingSymbol))
+    assert(!needNewStart || newStart != startingSymbol)
     val oldStartingSymbol = startingSymbol
+    val additionalRules = if (!needNewStart) List() else List(Rule(List(newStart), List(oldStartingSymbol)))
     val oldRules = rules
     val old = this
     new Grammar {
       override val startingSymbol : Symbol = if (needNewStart)
         newStart
       else oldStartingSymbol
-      override val rules: List[Rule] = oldRules.map {
-        case Rule(List(`oldStartingSymbol`), l) =>
+      override val rules: List[Rule] = (oldRules ++ additionalRules).map {
+        case Rule(List(this.startingSymbol), l) =>
           if (l.isEmpty || l.head.terminal) // all terminals
             Rule(List(startingSymbol), l)
           else
@@ -40,7 +42,7 @@ trait Grammar {
             Rule(List(startingSymbol), l ++ List(x))
           else
             Rule(List(l.head), l.tail ++ List(x))
-      }.distinct  ++ (if (needNewStart) List(Rule(List(startingSymbol), List(oldStartingSymbol))) else List())
+      }.distinct
     }
   }
 }
