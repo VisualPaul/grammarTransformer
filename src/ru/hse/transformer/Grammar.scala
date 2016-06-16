@@ -1,5 +1,7 @@
 package ru.hse.transformer
 
+import org.json4s.JValue
+
 import scala.io.Source
 
 sealed abstract class RegularCase
@@ -85,6 +87,7 @@ object Grammar {
     }
   }
   def printToConsole(grammar: Grammar): Unit = {
+    println("The starting symbol is %s".format(grammar.startingSymbol.id))
     for (rule <- grammar.rules) {
       val lhs = rule.lhs.map(_.id).mkString
       val rhs = if (rule.rhs.isEmpty) "ε" else rule.rhs.map(_.id).mkString
