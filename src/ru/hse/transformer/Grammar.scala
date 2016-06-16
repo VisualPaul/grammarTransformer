@@ -65,19 +65,20 @@ object Grammar {
       Symbol(str.exists(_.isLower), str)
     }).filter(_.id != "ε")
   }
+  def readRule(rule: String): Rule = {
+    val arr = rule.split("->").map(readRuleSide).toList
+    assert(arr.length <= 2 && arr.nonEmpty)
+    val (lhs, rhs) = arr match {
+      case List(x) => (x, List())
+      case List(x, y) => (x, y)
+      case _ => throw new RuntimeException("unreachable code reached")
+    }
+    assert(lhs.exists(!_.terminal))
+    Rule(lhs, rhs)
+  }
   def readFromConsole : Grammar = {
     val toTerm = (x: Char) => Symbol(x.isLower, x.toString)
-    val rules = Source.stdin.getLines.map(ln => {
-      val arr = ln.split("->").map(readRuleSide).toList
-      assert(arr.length <= 2 && arr.nonEmpty)
-      val (lhs, rhs) = arr match {
-        case List(x) => (x, List())
-        case List(x, y) => (x, y)
-        case _ => throw new RuntimeException("unreachable code reached")
-      }
-      assert(lhs.exists(!_.terminal))
-      Rule(lhs, rhs)
-    }).toList
+    val rules = Source.stdin.getLines.map(readRule).toList
     Grammar(startingSymbol=toTerm('S'), rules=rules)
   }
   def printToConsole(grammar: Grammar): Unit = {
